@@ -1,40 +1,61 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#c8102e">
-<meta name="robots" content="noindex,nofollow">
-<meta name="description" content="Área restrita para atualizar a agenda de eventos.">
-<title>Gerenciar agenda | Corporação Musical Arthur Giambelli</title>
-<link rel="icon" href="img/favicon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Public+Sans:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#c8102e">
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="description" content="Área restrita para atualizar a agenda de eventos.">
+    <title>Gerenciar agenda | Corporação Musical Arthur Giambelli</title>
+    <link rel="icon" href="img/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Public+Sans:wght@400;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body data-page="admin">
-<header id="hd"></header>
-<main>
-<section class="pagehead"><div class="wrap"><h1>Gerenciar agenda</h1><p>Cadastre, edite e exclua os eventos que aparecem na agenda do site.</p></div></section>
-<section><div class="wrap">
-<form id="login" class="adm"><label>Senha<input type="password" id="pw" required></label><div><button class="btn">Entrar</button></div></form>
-<div id="panel" hidden>
-<form id="ef" class="adm">
-<input type="hidden" name="k">
-<label>Título<input name="t" required></label>
-<label>Data<input type="date" name="d" required></label>
-<label>Hora<input type="time" name="h"></label>
-<label>Local<input name="l"></label>
-<label>Link (opcional)<input type="url" name="u" placeholder="https://"></label>
-<div><button class="btn">Salvar evento</button> <button type="button" class="btn o" id="cancel" hidden>Cancelar edição</button></div>
-</form>
-<h2 style="margin-top:44px;font-size:1.5rem">Eventos cadastrados</h2>
-<ul id="alist" class="alist"></ul>
-<p class="more"><a class="btn o" href="agenda.html">Ver a agenda no site</a></p>
-</div></div></section>
-</main>
-<footer id="ft"></footer>
-<a id="fab" class="fab" target="_blank" rel="noopener">WhatsApp</a>
-<script src="app.js"></script>
+    <header id="hd"></header>
+    <main>
+        <section class="pagehead">
+            <div class="wrap">
+                <h1>Gerenciar agenda</h1>
+                <p>Cadastre, edite e exclua os eventos que aparecem na agenda do site.</p>
+            </div>
+        </section>
+        <section>
+            <div class="wrap">
+                <form id="login" class="adm">
+                    <label>Senha<input type="password" id="pw" required autocomplete="current-password"
+                            aria-describedby="lerr">
+                    </label>
+                    <p id="lerr" class="err" role="alert" hidden></p>
+                    <div><button class="btn">Entrar</button></div>
+                </form>
+                <div id="panel" hidden>
+                    <p style="margin-bottom:20px"><button type="button" class="btn o" id="logout">Sair do painel</button></p>
+                    <p class="note" style="margin:0 0 20px;max-width:60ch">Atenção: por enquanto os eventos ficam salvos apenas neste navegador.</p>
+                    <form id="ef" class="adm">
+                        <input type="hidden" name="k">
+                        <label>Título<input name="t" required></label>
+                        <label>Data<input type="date" name="d" required></label>
+                        <label>Hora<input type="time" name="h"></label>
+                        <label>Local<input name="l"></label>
+                        <label>Link (opcional)<input type="url" name="u" placeholder="https://"></label>
+                        <div><button class="btn">Salvar evento</button> <button type="button" class="btn o" id="cancel"
+                                hidden>Cancelar edição</button></div>
+                    </form>
+                    <p id="msg" class="msg" role="status" hidden></p>
+                    <h2 style="margin-top:44px;font-size:1.5rem">Eventos cadastrados</h2>
+                    <ul id="alist" class="alist"></ul>
+                    <p class="more"><a class="btn o" href="agenda.html">Ver a agenda no site</a></p>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer id="ft"></footer>
+    <script src="app.js"></script>
 </body>
+
 </html>
