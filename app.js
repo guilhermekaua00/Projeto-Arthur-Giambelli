@@ -2,10 +2,11 @@
 const CONFIG={
   name:'Corporação Musical Arthur Giambelli',
   short:'Arthur Giambelli',
-  whatsapp:'5519999999999',      // DDI + DDD + número, só dígitos
-  youtubeKey:'',                 // chave da YouTube Data API v3 (restrinja ao domínio do site no Google Cloud)
-  youtubeChannelId:'',           // ID do canal (começa com UC): YouTube Studio > Configurações > Canal > Informações avançadas
-  adminPassword:'trocar-senha',  // senha de admin.html (proteção simples, fica no navegador)
+  whatsapp:'5519981499302',      // DDI + DDD + número, só dígitos
+  youtubeKey:'AIzaSyAgzzS8QuGuQamk7-dVnsHrTqtRi4jYS8g',                 // chave da YouTube Data API v3 (restrinja por referenciador ao domínio do site no Google Cloud)
+  youtubeHandle:'arthurgiambelli', // @ do canal (sem o @); com a chave, o site descobre sozinho a lista de vídeos
+  youtubeChannelId:'UC6_pEHE95km4mXapHR46B5Q', // opcional: ID do canal (UC...). Se preenchido, o player funciona mesmo sem chave
+  adminHash:'03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',                // SHA-256 da senha do painel (para trocar: ver README)
   links:[                        // o primeiro deve ser o YouTube; adicione outras mídias do grupo
     {nome:'YouTube',url:'https://www.youtube.com/@arthurgiambelli',desc:'Concertos, gravações e o documentário Alma Sonora de Limeira'},
     {nome:'Instagram',url:'https://www.instagram.com/',desc:'Novidades e bastidores'}
@@ -26,7 +27,7 @@ const pg=document.body.dataset.page;
 
 /* Cabeçalho, rodapé e links (iguais em todas as páginas) */
 $('#hd').innerHTML=`<div class="wrap"><a class="brand" href="index.html"><img src="img/logo.png" alt="" width="44" height="44"><span>${esc(CONFIG.short)}</span></a><nav aria-label="Principal">${PAGES.map(([h,t])=>`<a href="${h}"${h.startsWith(pg)?' aria-current="page"':''}>${t}</a>`).join('')}</nav></div>`;
-$('#ft').innerHTML=`<div class="wrap"><span>© ${new Date().getFullYear()} ${esc(CONFIG.name)}. Limeira, SP.</span><a href="admin.html">Área do administrador</a></div>`;
+$('#ft').innerHTML=`<div class="wrap"><span>© ${new Date().getFullYear()} ${esc(CONFIG.name)}. Limeira, SP.</span></div>`;
 $('#fab').href=zap(MSG);
 document.querySelectorAll('.wa').forEach(a=>a.href=zap(MSG));
 document.querySelectorAll('.yt').forEach(a=>a.href=safe(CONFIG.links[0].url));
@@ -57,7 +58,7 @@ function renderAdmin(){const el=$('#alist');if(!el)return;
   el.innerHTML=sorted().map(e=>`<li><span>${esc(e.d.split('-').reverse().join('/'))} · ${esc(e.t)}</span><button data-e="${e.id}">Editar</button><button data-x="${e.id}">Excluir</button></li>`).join('')||'<li>Nenhum evento cadastrado.</li>';}
 const refresh=()=>{renderEvents();renderAdmin()};
 
-/* Painel de administração (admin.html) */
+/* Painel de administração: arquivo CONFIG.adminPage, sem link no site */
 on('#ef',f=>{
   f.onsubmit=ev=>{ev.preventDefault();const all=getEvents();
     const e={id:+f.k.value||Date.now(),t:f.t.value.trim(),d:f.d.value,h:f.h.value,l:f.l.value.trim(),u:f.u.value.trim()};
@@ -71,28 +72,50 @@ on('#ef',f=>{
       $('#cancel').hidden=false;f.scrollIntoView({behavior:'smooth'})}};
   const ss={get(){try{return sessionStorage.getItem('adm')}catch{}},set(){try{sessionStorage.setItem('adm','1')}catch{}}};
   const show=()=>{const ok=ss.get()==='1';$('#login').hidden=ok;$('#panel').hidden=!ok};
-  $('#login').onsubmit=ev=>{ev.preventDefault();if($('#pw').value===CONFIG.adminPassword){ss.set();show()}else alert('Senha incorreta.')};
+  const sha=async t=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  $('#login').onsubmit=async ev=>{ev.preventDefault();
+    if(!crypto.subtle){alert('Abra o painel por https:// ou localhost.');return}
+    if(await sha($('#pw').value)===CONFIG.adminHash){ss.set();show()}else alert('Senha incorreta.')};
   show();
 });
 
-/* ===== YOUTUBE: alimenta o player e as Notícias ===== */
-async function videos(){
-  const k=CONFIG.youtubeKey,c=CONFIG.youtubeChannelId;
-  if(!k||!c)return[];
-  const cache=store.get('yt',null);
-  if(cache&&Date.now()-cache.t<36e5)return cache.v;   // guarda por 1 hora para poupar cota
-  try{
-    // playlist de uploads = ID do canal com "UC" trocado por "UU" (custa 1 unidade de cota)
-    const r=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=12&playlistId=UU${c.slice(2)}&key=${k}`);
-    if(!r.ok)throw new Error(r.status);
-    const v=(await r.json()).items.map(i=>({id:i.snippet.resourceId.videoId,t:dec(i.snippet.title),d:i.snippet.publishedAt,
-      img:((i.snippet.thumbnails||{}).medium||{}).url})).filter(x=>x.img);
-    store.set('yt',{t:Date.now(),v});return v;
-  }catch(e){console.warn('YouTube API:',e);return cache?cache.v:[]}
+/* ===== YOUTUBE: alimenta o player e as Notícias =====
+   Com chave + @ do canal: lista os vídeos (player do mais recente e grade em Notícias).
+   Só com o ID do canal: o player toca a lista de envios, sem chave.
+   Sem nada disso: mostra um link para o canal. */
+const YT_API='https://www.googleapis.com/youtube/v3/';
+async function uploadsId(){
+  if(CONFIG.youtubeChannelId)return 'UU'+CONFIG.youtubeChannelId.slice(2);   // UC... -> UU... = playlist de envios
+  const k=CONFIG.youtubeKey,h=CONFIG.youtubeHandle;
+  if(!k||!h)return'';
+  const c=store.get('ytu',null);
+  if(c&&c.h===h)return c.id;
+  const r=await fetch(`${YT_API}channels?part=contentDetails&forHandle=${encodeURIComponent(h)}&key=${k}`);
+  if(!r.ok)throw new Error(r.status);
+  const it=((await r.json()).items||[])[0];
+  const id=it&&it.contentDetails.relatedPlaylists.uploads||'';
+  if(id)store.set('ytu',{h,id});
+  return id;
 }
-if($('#player')||$('#news'))videos().then(v=>{
-  on('#player',e=>e.innerHTML=v.length
-    ?`<iframe src="https://www.youtube-nocookie.com/embed/${esc(v[0].id)}" title="${esc(v[0].t)}" loading="lazy" allowfullscreen></iframe>`
+async function videos(){
+  let list='',v=[];
+  try{list=await uploadsId()}catch(e){console.warn('YouTube API:',e)}
+  if(!list||!CONFIG.youtubeKey)return{list,v};
+  const cache=store.get('yt',null);
+  if(cache&&cache.l===list&&Date.now()-cache.t<36e5)return{list,v:cache.v};   // guarda por 1 hora para poupar cota
+  try{
+    const r=await fetch(`${YT_API}playlistItems?part=snippet&maxResults=12&playlistId=${list}&key=${CONFIG.youtubeKey}`);
+    if(!r.ok)throw new Error(r.status);
+    v=(await r.json()).items.map(i=>({id:i.snippet.resourceId.videoId,t:dec(i.snippet.title),d:i.snippet.publishedAt,
+      img:((i.snippet.thumbnails||{}).medium||{}).url})).filter(x=>x.img);
+    store.set('yt',{t:Date.now(),l:list,v});
+  }catch(e){console.warn('YouTube API:',e);v=cache&&cache.l===list?cache.v:[]}
+  return{list,v};
+}
+const ytFrame=(src,t)=>`<iframe src="https://www.youtube-nocookie.com/embed/${src}" title="${esc(t)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+if($('#player')||$('#news'))videos().then(({list,v})=>{
+  on('#player',e=>e.innerHTML=v.length?ytFrame(esc(v[0].id),v[0].t)
+    :list?ytFrame('videoseries?list='+esc(list),'Vídeos da '+CONFIG.name)
     :`<a class="ph" href="${esc(safe(CONFIG.links[0].url))}" target="_blank" rel="noopener"><b>▶</b>Assista aos nossos concertos no YouTube</a>`);
   on('#news',e=>e.innerHTML=v.length>1
     ?v.slice(1).map(x=>`<a href="https://www.youtube.com/watch?v=${esc(x.id)}" target="_blank" rel="noopener"><img src="${esc(x.img)}" alt="" loading="lazy"><time datetime="${esc(x.d)}">${new Date(x.d).toLocaleDateString('pt-BR')}</time><h3>${esc(x.t)}</h3></a>`).join('')
